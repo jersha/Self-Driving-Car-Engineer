@@ -1,54 +1,56 @@
+#doing all the relevant imports
 import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
 import numpy as np
+import cv2
 
-# Read in the image and print out some stats
-Image = mpimg.imread("res/Test.jpg")
-print('This image is: ', type(Image), 'with dimensions: ', Image.shape)
+# Read in the image and convert to grayscale
+Image = mpimg.imread("../res/exit-ramp.jpg")
+Gray = cv2.cvtColor(Image, cv2.COLOR_RGB2GRAY)
 
-# Grab the x and y size and make a copy of the image
-Ysize = Image.shape[0]
-Xsize = Image.shape[1]
+# Define a kernel size for Gaussian smoothing / blurring
+KernalSize = 5
+BlurGray = cv2.GaussianBlur(Gray, (KernalSize, KernalSize), 0)
 
-# Note: always make a copy rather than simply using "=" 
-ColorSelect = np.copy(Image)
+# Define parameters for Canny and run it
+LowThreshold = 50
+HighThreshold = 150
+Edges = cv2.Canny(BlurGray, LowThreshold, HighThreshold)
 
-# Define a triangle region of interest 
-# Keep in mind the origin (x=0, y=0) is in the upper left in image processing
-LeftBottom = [150, 539]
-RightBottom = [850, 539]
-Apex = [500, 250]
+# Next we'll create a masked edges image using cv2.fillPoly()
+Mask = np.zeros_like(Edges)
+IgnoreMaskColor = 255
 
-# Fit lines (y=Ax+B) to identify the  3 sided region of interest
-# np.polyfit() returns the coefficients [A, B] of the fit
-FitLeft = np.polyfit((LeftBottom[0], Apex[0]), (LeftBottom[1], Apex[1]), 1)
-FitRight = np.polyfit((RightBottom[0], Apex[0]), (RightBottom[1], Apex[1]), 1)
-FitBottom = np.polyfit((LeftBottom[0], RightBottom[0]), (LeftBottom[1], RightBottom[1]), 1)
+# This time we are defining a four sided polygon to mask
+IMShape = Image.shape
+Vertices = np.array([[(0,imshape[0]),(450, 290), (490, 290), (imshape[1],imshape[0])]], dtype=np.int32)
+cv2.fillPoly(Mask, Vertices, IgnoreMaskColor)
+MaskedEdges = cv2.bitwise_and(Edges, Mask)
 
-# Define our color selection criteria
-RedThreshold = 200
-GreenThreshold = 200
-BlueThreshold = 200
-RgbThreshold = [RedThreshold, GreenThreshold, BlueThreshold]
+# Define the Hough transform parameters
+Rho = 2
+Theta = np.pi/180
+Threshold = 15
+MinLineLength = 40
+MaxLineGap = 20
 
-# Identify pixels below the threshold
-ColorThresholds = (Image[:, :, 0] < RgbThreshold[0])\
-            | (Image[:, :, 1] < RgbThreshold[1])\
-            | (Image[:, :, 2] < RgbThreshold[2])
-            
-# Find the region inside the lines
-# Left(Ax+B < y), Right(Ax+B < y), Bottom(Ax+B > y)
-XX, YY = np.meshgrid(np.arange(0, Xsize), np.arange(0, Ysize))
-RegionThreshold = (YY > (XX*FitLeft[0] + FitLeft[1])) & \
-                    (YY > (XX*FitRight[0] + FitRight[1])) & \
-                    (YY < (XX*FitBottom[0] + FitBottom[1]))
+# Make a blank the same size as our image to draw on
+LineImage = np.copy(Image) * 0
 
-# Mask color selection
-ColorSelect[ColorThresholds] = [0, 0, 0] 
+# Run Hough on edge detected image
+Lines = cv2.HoughLinesP(MaskedEdges, Rho, Theta, Threshold, np.array([]), 
+                        MinLineLength, MaxLineGap)
 
-# Find where image is both colored right and in the region
-ColorSelect[~ColorThresholds & RegionThreshold] = [255, 0, 0]
+# Iterate over the output "lines" and draw lines on the blank
+for Line in Lines:
+    for x1, y1, x2, y2 in Line:
+        cv2.line(LineImage, (x1, y1), (x2, y2), (255, 0, 0), 10)
+
+# Create a "color" binary image to combine with line image
+ColorEdges = np.dstack((Edges, Edges, Edges))
+
+# Draw the lines on the edge image
+Combo = cv2.addWeighted(ColorEdges, 0.8, LineImage, 1, 0)
 
 # Display the image
-plt.imshow(ColorSelect)
-plt.show()
+plt.imshow(Combo)
