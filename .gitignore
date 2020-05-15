@@ -1,0 +1,7 @@
+# Directories
+.vs/
+bin/
+src/test.py
+
+# Files
+*.user
