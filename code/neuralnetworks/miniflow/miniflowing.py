@@ -40,15 +40,14 @@ class Input(Node):
         #
         # Example:
         # val0 = self.inbound_nodes[0].value
-    def forward(self, value=None):
+    def forward(self):
         # Overwrite the value if one is passed in.
-        if value is not None:
-            self.value = value
+        pass
 
 
 class Linear(Node):
-    def __init__(self, inputs, weights, bias):
-        Node.__init__(self, [inputs, weights, bias])
+    def __init__(self, X, W, b):
+        Node.__init__(self, [X, W, b])
 
         # NOTE: The weights and bias properties here are not
         # numbers, but rather references to other nodes.
@@ -65,6 +64,23 @@ class Linear(Node):
         W = self.inbound_nodes[1].value
         b = self.inbound_nodes[2].value
         self.value = np.dot(X, W) + b
+        
+class Sigmoid(Node):
+    def __init__(self, node):
+        Node.__init__(self, [node])
+
+    def _sigmoid(self, x):
+        """
+        This method is separate from `forward` because it
+        will be used with `backward` as well.
+
+        `x`: A numpy array-like object.
+        """
+        return 1. / (1. + np.exp(-x)) # the `.` ensures that `1` is a float
+
+    def forward(self):
+        input_value = self.inbound_nodes[0].value
+        self.value = self._sigmoid(input_value)
 
 
 
