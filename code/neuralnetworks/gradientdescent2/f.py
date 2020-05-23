@@ -28,7 +28,7 @@ def df(x):
 x = random.randint(0, 10000)
 # TODO: Set the learning rate
 learning_rate = 0.01
-epochs = 1000
+epochs = 100
 
 for i in range(epochs+1):
     cost = f(x)
